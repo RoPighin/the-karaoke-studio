@@ -340,3 +340,27 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.lyrics-scroll {
+  position: relative;
+  max-height: 65vh;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding: 2rem 1rem;
+}
+
+.lyric-line {
+  color: rgba(255, 255, 255, 0.45);
+  transition: color 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+}
+
+.lyric-line.past {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.lyric-line.active {
+  color: #ffffff;
+  font-weight: 700;
+  transform: scale(1.03);
+}

@@ -7,20 +7,38 @@ export default function YouTubeStage({
   playerRef,
 }) {
   const containerRef = useRef(null);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  const initializedRef = useRef(false);
+
+  onTimeUpdateRef.current = onTimeUpdate;
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const player = playerRef.current;
+      if (player && typeof player.getCurrentTime === "function") {
+        const t = player.getCurrentTime();
+        if (typeof t === "number" && !Number.isNaN(t) && onTimeUpdateRef.current) {
+          onTimeUpdateRef.current(t);
+        }
+      }
+    }, 200);
+
+    return () => clearInterval(intervalId);
+  }, [playerRef]);
 
   useEffect(() => {
     if (!videoId) return;
 
-    let intervalId = null;
-
-    const createPlayer = () => {
-      if (!containerRef.current) return;
-
-      if (playerRef.current) {
+    const mountOrLoad = () => {
+      if (playerRef.current && typeof playerRef.current.loadVideoById === "function") {
         playerRef.current.loadVideoById(videoId);
         return;
       }
 
+      if (!containerRef.current || initializedRef.current) return;
+      if (!window.YT || !window.YT.Player) return;
+
+      initializedRef.current = true;
       playerRef.current = new window.YT.Player(containerRef.current, {
         videoId,
         width: "100%",
@@ -31,22 +49,21 @@ export default function YouTubeStage({
           modestbranding: 1,
         },
         events: {
-          onReady: () => {
-            intervalId = setInterval(() => {
-              if (
-                playerRef.current &&
-                typeof playerRef.current.getCurrentTime === "function"
-              ) {
-                onTimeUpdate(playerRef.current.getCurrentTime());
-              }
-            }, 250);
+          onStateChange: (event) => {
+            if (
+              playerRef.current &&
+              typeof playerRef.current.getCurrentTime === "function" &&
+              onTimeUpdateRef.current
+            ) {
+              onTimeUpdateRef.current(playerRef.current.getCurrentTime());
+            }
           },
         },
       });
     };
 
     if (window.YT && window.YT.Player) {
-      createPlayer();
+      mountOrLoad();
     } else {
       const existingScript = document.getElementById("youtube-iframe-api");
       if (!existingScript) {
@@ -55,13 +72,13 @@ export default function YouTubeStage({
         tag.src = "https://www.youtube.com/iframe_api";
         document.body.appendChild(tag);
       }
-      window.onYouTubeIframeAPIReady = createPlayer;
+      const prevCallback = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (typeof prevCallback === "function") prevCallback();
+        mountOrLoad();
+      };
     }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [videoId, onTimeUpdate, playerRef]);
+  }, [videoId, playerRef]);
 
   return (
     <div className={`video-stage ${hidden ? "video-stage--audio-only" : ""}`}>
